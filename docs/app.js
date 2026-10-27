@@ -3,8 +3,13 @@ const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山�
 const TYPE_COLOR = { 'DPC参加病院': 'var(--dpc)', 'DPC準備病院': 'var(--prep)', '出来高算定病院': 'var(--deki)' };
 const TYPE_HEX = { 'DPC参加病院': '#c0392b', 'DPC準備病院': '#d68910', '出来高算定病院': '#2e86c1', none: '#8a8f98' };
 const GROUPS = { pci: '冠動脈インターベンション', ep: '不整脈デバイス・アブレーション', shd: '構造的心疾患（SHD）', vasc: '大動脈・末梢血管' };
+// 治療グループの色：地図上は全組み合わせで見分ける必要があるため、検証済みの3色を主要3グループに、
+// 少数の2グループは灰色（グループ名はツールチップと詳細で表示）にする
+const GROUP_HEX = { shd: '#2a78d6', pci_ep: '#eb6834', pci: '#1baf7a', ep: '#6b7079', vasc: '#6b7079', none: '#c4c7cc', nodpc: '#c4c7cc' };
+const groupKey = h => h.gr || 'nodpc';
 
-let H = [], META = null, map, layer, markers = new Map(), selected = null;
+let H = [], META = null, map, layer, legendDiv, markers = new Map(), selected = null;
+const groupOn = new Set();
 const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString('ja-JP');
 
@@ -46,16 +51,12 @@ async function init() {
     attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">地理院タイル</a>', maxZoom: 18,
   }).addTo(map);
   const legend = L.control({ position: 'bottomleft' });
-  legend.onAdd = () => {
-    const d = L.DomUtil.create('div', 'legend');
-    d.innerHTML = Object.entries({ 'DPC参加病院': 'DPC参加病院', 'DPC準備病院': 'DPC準備病院', '出来高算定病院': 'DPCデータ提出（出来高）', none: 'DPCデータなし' })
-      .map(([k, l]) => `<i style="background:${TYPE_HEX[k]}"></i>${l}`).join('<br>');
-    return d;
-  };
+  legend.onAdd = () => (legendDiv = L.DomUtil.create('div', 'legend'));
   legend.addTo(map);
   layer = L.layerGroup().addTo(map);
 
-  ['pref', 'filter', 'beds', 'size'].forEach(id => $(id).addEventListener('change', render));
+  META.groups.forEach(g => groupOn.add(g.key)); groupOn.add('nodpc');
+  ['pref', 'filter', 'beds', 'size', 'color'].forEach(id => $(id).addEventListener('change', render));
   $('pref').addEventListener('change', () => {
     const p = +$('pref').value; if (!p) return map.setView([36.5, 137.5], 6);
     const pts = H.filter(h => h.p === p).map(h => [h.lat, h.lng]);
@@ -70,16 +71,44 @@ async function init() {
   if (initial) select(initial, true);
 }
 
-function visible() {
+// グループのチェックを除いた絞り込み（グループ別件数の表示に使う）
+function baseVisible() {
   const p = +$('pref').value, f = $('filter').value, b = +$('beds').value;
   return H.filter(h => (!p || h.p === p)
     && (f === 'all' || (f === 'dpc' && /DPC/.test(h.dpc?.t || '')) || (f === 'cath' && h.cathAny))
     && (h.b[5] || 0) >= b);
 }
+const visible = () => baseVisible().filter(h => groupOn.has(groupKey(h)));
+const colorOf = h => $('color').value === 'group' ? GROUP_HEX[groupKey(h)] : TYPE_HEX[h.dpc?.t] || TYPE_HEX.none;
+const groupLabel = h => META.groups.find(g => g.key === h.gr)?.label || 'DPCデータなし';
+
+function renderGroups() {
+  const base = baseVisible();
+  const rows = [...META.groups, { key: 'nodpc', label: 'DPCデータなし' }]
+    .map(g => ({ g, n: base.filter(h => groupKey(h) === g.key).length }))
+    .filter(x => x.n > 0 || !groupOn.has(x.g.key));
+  $('groups').innerHTML = '<h2>カテーテル治療グループ</h2>' + rows.map(({ g, n }) => `
+    <label title="${g.desc || ''}"><input type="checkbox" data-k="${g.key}" ${groupOn.has(g.key) ? 'checked' : ''}>
+      <span class="sw" style="background:${GROUP_HEX[g.key]}"></span><span>${g.label}</span><span class="v">${fmt(n)}</span></label>`).join('') +
+    '<p class="note">実施（10件以上）している治療の組み合わせで、上から順に判定。項目にカーソルを合わせると条件を表示します。</p>';
+  $('groups').querySelectorAll('input').forEach(el => el.onchange = () => {
+    el.checked ? groupOn.add(el.dataset.k) : groupOn.delete(el.dataset.k); render();
+  });
+}
+
+function renderLegend() {
+  const items = $('color').value === 'group'
+    ? [['shd', '構造的心疾患（SHD）まで対応'], ['pci_ep', '冠動脈＋アブレーション'], ['pci', '冠動脈インターベンション中心'],
+       ['ep', '不整脈・デバイス／血管中心'], ['none', '10件以上の治療なし・DPCなし']].map(([k, l]) => [GROUP_HEX[k], l])
+    : Object.entries({ 'DPC参加病院': 'DPC参加病院', 'DPC準備病院': 'DPC準備病院', '出来高算定病院': 'DPCデータ提出（出来高）', none: 'DPCデータなし' })
+       .map(([k, l]) => [TYPE_HEX[k], l]);
+  legendDiv.innerHTML = items.map(([c, l]) => `<i style="background:${c}"></i>${l}`).join('<br>');
+}
 
 function render() {
   const def = SIZE_DEFS.find(d => d.id === $('size').value);
   const list = visible();
+  renderGroups(); renderLegend();
   const max = Math.max(1, ...list.map(h => sizeValue(h, def)));
   layer.clearLayers(); markers.clear();
   // 小さい円を上に描くため値の大きい順に追加
@@ -87,11 +116,10 @@ function render() {
   for (const h of list) {
     const v = sizeValue(h, def);
     const r = 2.5 + 16 * Math.sqrt(v / max);
-    const col = TYPE_HEX[h.dpc?.t] || TYPE_HEX.none;
     const m = L.circleMarker([h.lat, h.lng], {
       radius: r, color: h === selected ? '#111' : '#fff', weight: h === selected ? 2.5 : 0.7,
-      fillColor: col, fillOpacity: 0.75,
-    }).bindTooltip(`${h.n}<br>${def.label}: ${def.keys ? fmt(v) + '件' : fmt(v) + '床'}`, { direction: 'top' });
+      fillColor: colorOf(h), fillOpacity: 0.8,
+    }).bindTooltip(`${h.n}<br>${groupLabel(h)}<br>${def.label}: ${def.keys ? fmt(v) + '件' : fmt(v) + '床'}`, { direction: 'top' });
     m.on('click', () => select(h));
     m.addTo(layer); markers.set(h.id, m);
   }
@@ -157,6 +185,8 @@ function select(h, fly) {
       ${d?.nb ? `<span class="badge">${d.nb}</span>` : ''}
       ${d?.m != null && d.m < 12 ? `<span class="badge">データ提出 ${d.m}か月</span>` : ''}
     </div>
+    ${h.gr ? `<div class="group-box"><b><span class="sw" style="background:${GROUP_HEX[h.gr]}"></span>${groupLabel(h)}</b>
+      <p>${META.groups.find(g => g.key === h.gr).desc}</p></div>` : ''}
     <section><h3>病床数（合計 ${h.b[5] != null ? fmt(h.b[5]) + '床' : '不明'}）</h3><div class="beds">${bedsHtml || '<span class="note">内訳の登録なし</span>'}</div>
       ${d?.db ? `<p class="note">DPC算定病床：${fmt(d.db)}床</p>` : ''}</section>
     <section><h3>カテーテル室の循環器治療実績（${META.dpcPeriod}）</h3>${cathHtml}</section>
@@ -179,7 +209,7 @@ function setupSearch() {
     box.querySelectorAll('[data-id]').forEach(el => el.onclick = () => {
       box.hidden = true; q.value = '';
       const h = H.find(x => x.id === el.dataset.id);
-      if (!visible().includes(h)) { $('filter').value = 'all'; $('beds').value = '0'; $('pref').value = ''; }
+      if (!visible().includes(h)) { $('filter').value = 'all'; $('beds').value = '0'; $('pref').value = ''; groupOn.add(groupKey(h)); }
       select(h, true);
     });
   });

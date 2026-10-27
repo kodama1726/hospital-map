@@ -154,6 +154,28 @@ for (const r of m.slice(4)) {
   cath.set(k, v);
 }
 
+// ---------- カテーテル治療グループ ----------
+// 実施（10件以上＝公表値あり）している治療の組み合わせで、上位の機能から順に判定する
+const GROUPS = [
+  { key: 'shd', label: '構造的心疾患（SHD）まで対応', desc: '経カテーテル弁治療または経皮的左心耳閉鎖術を10件以上実施' },
+  { key: 'pci_ep', label: '冠動脈＋アブレーション', desc: 'PCIとカテーテルアブレーションをともに10件以上実施（SHDは10件未満）' },
+  { key: 'pci', label: '冠動脈インターベンション中心', desc: 'PCIを10件以上実施（アブレーション・SHDは10件未満）' },
+  { key: 'ep', label: '不整脈・デバイス中心', desc: 'PCIは10件未満で、アブレーションまたはペースメーカー等を10件以上実施' },
+  { key: 'vasc', label: '大動脈・末梢血管中心', desc: 'PCI・不整脈治療は10件未満で、ステントグラフトまたは末梢血管内治療を10件以上実施' },
+  { key: 'none', label: '10件以上の治療なし', desc: 'DPCデータはあるが、いずれのカテーテル治療も10件未満' },
+];
+function groupOf(c) {
+  if (!c) return undefined;
+  const has = k => c[k] > 0;
+  if (has('shd') || has('laao')) return 'shd';
+  const pci = has('pci_ami') || has('pci_ap');
+  if (pci && has('abl')) return 'pci_ep';
+  if (pci) return 'pci';
+  if (has('abl') || has('pm')) return 'ep';
+  if (['sg_ad', 'sg_rupt', 'sg_aneu', 'evt'].some(has)) return 'vasc';
+  return 'none';
+}
+
 // ---------- 突合（DPC → 医療情報ネット） ----------
 const byCity = new Map();
 for (const h of navi) { if (!byCity.has(h.city)) byCity.set(h.city, []); byCity.get(h.city).push(h); }
@@ -200,6 +222,7 @@ const hospitals = navi.filter(h => h.lat && h.lng).map(h => {
   if (mt) {
     const d = mt.d;
     o.dpc = { k: d.kokuji, n: d.name, t: d.type, nb: d.nyuin, db: d.dpcBeds, m: d.months, iu: d.indexUrl || undefined, c: cath.get(d.kokuji) };
+    o.gr = groupOf(o.dpc.c);
   }
   return o;
 });
@@ -210,15 +233,17 @@ fs.writeFileSync(path.join(OUT, 'meta.json'), JSON.stringify({
   naviDate: '2026-06-01',
   dpcPeriod: '令和6年度（令和6年6月〜令和7年5月退院）',
   cath: CATH.map(({ key, label, dpc, op, group, note }) => ({ key, label, dpc, op, group, note })),
+  groups: GROUPS,
 }, null, 1));
 
 // 確認用：統合CSV と 突合結果CSV
 const cols = ['医療情報ネットID', '正式名称', '都道府県コード', '所在地', '緯度', '経度', '一般病床', '療養病床', '精神病床', '結核病床', '感染症病床', '合計病床数',
-  'DPC告示番号', 'DPC施設名', 'DPC区分', 'DPC算定病床数', '入院基本料', ...CATH.map(x => x.label + '_件数'), 'MDC05件数合計'];
+  'DPC告示番号', 'DPC施設名', 'DPC区分', 'DPC算定病床数', '入院基本料', 'カテーテル治療グループ', ...CATH.map(x => x.label + '_件数'), 'MDC05件数合計'];
 const lines = [cols.join(',')];
 for (const o of hospitals) {
   const c = o.dpc?.c || {};
   lines.push([o.id, o.n, o.p, o.a, o.lat, o.lng, ...o.b, o.dpc?.k, o.dpc?.n, o.dpc?.t, o.dpc?.db, o.dpc?.nb,
+    GROUPS.find(g => g.key === o.gr)?.label,
     ...CATH.map(x => (c[x.key] === -1 ? '0-9' : c[x.key])), c.mdc05].map(csvCell).join(','));
 }
 fs.writeFileSync(path.join(__dirname, '..', 'hospitals_merged.csv'), '﻿' + lines.join('\n'));
@@ -243,4 +268,5 @@ console.log(byType);
 const cathHosp = hospitals.filter(o => o.dpc?.c && CATH.some(x => o.dpc.c[x.key] > 0)).length;
 console.log('カテーテル治療のいずれかが10件以上の病院:', cathHosp);
 for (const x of CATH) console.log(' ', x.label, hospitals.filter(o => o.dpc?.c?.[x.key] > 0).length, '施設');
+for (const g of GROUPS) console.log('[グループ]', g.label, hospitals.filter(o => o.gr === g.key).length, '施設');
 console.log('JSONサイズ(KB):', Math.round(fs.statSync(path.join(OUT, 'hospitals.json')).size / 1024));
