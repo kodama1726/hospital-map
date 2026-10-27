@@ -1,15 +1,41 @@
 // 病院マップ：医療情報ネット × DPC退院患者調査 を地図上で閲覧する
 const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
-const TYPE_COLOR = { 'DPC参加病院': 'var(--dpc)', 'DPC準備病院': 'var(--prep)', '出来高算定病院': 'var(--deki)' };
 const TYPE_HEX = { 'DPC参加病院': '#c0392b', 'DPC準備病院': '#d68910', '出来高算定病院': '#2e86c1', none: '#8a8f98' };
 const GROUPS = { pci: '冠動脈インターベンション', ep: '不整脈デバイス・アブレーション', shd: '構造的心疾患（SHD）', vasc: '大動脈・末梢血管' };
 // 治療グループの色：地図上は全組み合わせで見分ける必要があるため、検証済みの3色を主要3グループに、
 // 少数の2グループは灰色（グループ名はツールチップと詳細で表示）にする
 const GROUP_HEX = { shd: '#2a78d6', pci_ep: '#eb6834', pci: '#1baf7a', ep: '#6b7079', vasc: '#6b7079', none: '#c4c7cc', nodpc: '#c4c7cc' };
-const groupKey = h => h.gr || 'nodpc';
+// クラスターの色：対応範囲の広さの順に青の濃淡（濃いほど広い）、構成の異なる「待機的PCI・末梢血管中心」だけ別色
+const CLUSTER_HEX = { c_all: '#0d366b', c_shd: '#184f95', c_pci_ep_ao: '#256abf', c_pci_ep: '#3987e5', c_pci: '#6da7ec', c_small: '#9ec5f4', c_elective: '#eb6834', na: '#c4c7cc' };
+
+// 色分け・絞り込みの単位（分類）。各分類のカテゴリをチェックで表示切替する
+const MODES = {
+  group: {
+    title: 'カテーテル治療グループ（ルール）',
+    note: '実施（10件以上）している治療の組み合わせで、上から順に判定。項目にカーソルを合わせると条件を表示します。',
+    cats: () => [...META.groups, { key: 'nodpc', label: 'DPCデータなし' }],
+    key: h => h.gr || 'nodpc', color: k => GROUP_HEX[k],
+  },
+  cluster: {
+    title: 'クラスター（実績の類似度）',
+    note: () => `${META.clusterInfo.n}施設の8治療の実績（件数を対数変換・標準化）を${META.clusterInfo.method}で${META.clusterInfo.k}群に分類。
+      シルエット係数 ${META.clusterInfo.silhouette}（群の境界はなだらかで、規模の連続的な違いが主）。項目にカーソルを合わせると各群の中央値を表示します。`,
+    cats: () => [...META.clusters.map(c => ({ ...c, desc: c.profile.map(p => `${p.label} ${p.median}件`).join('、') + '（中央値）' })),
+      { key: 'na', label: '対象外（いずれも10件未満・DPCなし）' }],
+    key: h => h.cl || 'na', color: k => CLUSTER_HEX[k],
+  },
+  type: {
+    title: 'DPC区分',
+    note: '',
+    cats: () => [{ key: 'DPC参加病院', label: 'DPC参加病院' }, { key: 'DPC準備病院', label: 'DPC準備病院' },
+      { key: '出来高算定病院', label: 'DPCデータ提出（出来高）' }, { key: 'none', label: 'DPCデータなし' }],
+    key: h => h.dpc?.t || 'none', color: k => TYPE_HEX[k],
+  },
+};
+const mode = () => MODES[$('color').value];
 
 let H = [], META = null, map, layer, legendDiv, markers = new Map(), selected = null;
-const groupOn = new Set();
+const catOn = {}; // 分類ごとの表示中カテゴリ
 const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString('ja-JP');
 
@@ -55,7 +81,7 @@ async function init() {
   legend.addTo(map);
   layer = L.layerGroup().addTo(map);
 
-  META.groups.forEach(g => groupOn.add(g.key)); groupOn.add('nodpc');
+  for (const [id, m] of Object.entries(MODES)) catOn[id] = new Set(m.cats().map(c => c.key));
   ['pref', 'filter', 'beds', 'size', 'color'].forEach(id => $(id).addEventListener('change', render));
   $('pref').addEventListener('change', () => {
     const p = +$('pref').value; if (!p) return map.setView([36.5, 137.5], 6);
@@ -65,6 +91,9 @@ async function init() {
   map.on('moveend', renderRank);
   $('close').onclick = () => { $('detail').hidden = true; selected = null; history.replaceState(null, '', location.pathname); render(); };
   setupSearch();
+  // ?c=group|cluster|type で色分けを指定
+  const c0 = new URLSearchParams(location.search).get('c');
+  if (MODES[c0]) $('color').value = c0;
   render();
   // ?h=<医療情報ネットID> で病院を指定して開く
   const initial = H.find(h => h.id === new URLSearchParams(location.search).get('h'));
@@ -78,31 +107,28 @@ function baseVisible() {
     && (f === 'all' || (f === 'dpc' && /DPC/.test(h.dpc?.t || '')) || (f === 'cath' && h.cathAny))
     && (h.b[5] || 0) >= b);
 }
-const visible = () => baseVisible().filter(h => groupOn.has(groupKey(h)));
-const colorOf = h => $('color').value === 'group' ? GROUP_HEX[groupKey(h)] : TYPE_HEX[h.dpc?.t] || TYPE_HEX.none;
+const visible = () => { const m = mode(), on = catOn[$('color').value]; return baseVisible().filter(h => on.has(m.key(h))); };
+const colorOf = h => { const m = mode(); return m.color(m.key(h)); };
 const groupLabel = h => META.groups.find(g => g.key === h.gr)?.label || 'DPCデータなし';
+const clusterOf = h => META.clusters.find(c => c.key === h.cl);
+const catLabel = h => { const m = mode(); return m.cats().find(c => c.key === m.key(h))?.label || ''; };
 
 function renderGroups() {
-  const base = baseVisible();
-  const rows = [...META.groups, { key: 'nodpc', label: 'DPCデータなし' }]
-    .map(g => ({ g, n: base.filter(h => groupKey(h) === g.key).length }))
-    .filter(x => x.n > 0 || !groupOn.has(x.g.key));
-  $('groups').innerHTML = '<h2>カテーテル治療グループ</h2>' + rows.map(({ g, n }) => `
-    <label title="${g.desc || ''}"><input type="checkbox" data-k="${g.key}" ${groupOn.has(g.key) ? 'checked' : ''}>
-      <span class="sw" style="background:${GROUP_HEX[g.key]}"></span><span>${g.label}</span><span class="v">${fmt(n)}</span></label>`).join('') +
-    '<p class="note">実施（10件以上）している治療の組み合わせで、上から順に判定。項目にカーソルを合わせると条件を表示します。</p>';
+  const m = mode(), on = catOn[$('color').value], base = baseVisible();
+  const rows = m.cats().map(c => ({ c, n: base.filter(h => m.key(h) === c.key).length })).filter(x => x.n > 0 || !on.has(x.c.key));
+  const note = typeof m.note === 'function' ? m.note() : m.note;
+  $('groups').innerHTML = `<h2>${m.title}</h2>` + rows.map(({ c, n }) => `
+    <label title="${c.desc || ''}"><input type="checkbox" data-k="${c.key}" ${on.has(c.key) ? 'checked' : ''}>
+      <span class="sw" style="background:${m.color(c.key)}"></span><span>${c.label}</span><span class="v">${fmt(n)}</span></label>`).join('') +
+    (note ? `<p class="note">${note}</p>` : '');
   $('groups').querySelectorAll('input').forEach(el => el.onchange = () => {
-    el.checked ? groupOn.add(el.dataset.k) : groupOn.delete(el.dataset.k); render();
+    el.checked ? on.add(el.dataset.k) : on.delete(el.dataset.k); render();
   });
 }
 
 function renderLegend() {
-  const items = $('color').value === 'group'
-    ? [['shd', '構造的心疾患（SHD）まで対応'], ['pci_ep', '冠動脈＋アブレーション'], ['pci', '冠動脈インターベンション中心'],
-       ['ep', '不整脈・デバイス／血管中心'], ['none', '10件以上の治療なし・DPCなし']].map(([k, l]) => [GROUP_HEX[k], l])
-    : Object.entries({ 'DPC参加病院': 'DPC参加病院', 'DPC準備病院': 'DPC準備病院', '出来高算定病院': 'DPCデータ提出（出来高）', none: 'DPCデータなし' })
-       .map(([k, l]) => [TYPE_HEX[k], l]);
-  legendDiv.innerHTML = items.map(([c, l]) => `<i style="background:${c}"></i>${l}`).join('<br>');
+  const m = mode();
+  legendDiv.innerHTML = m.cats().map(c => `<i style="background:${m.color(c.key)}"></i>${c.label}`).join('<br>');
 }
 
 function render() {
@@ -119,7 +145,7 @@ function render() {
     const m = L.circleMarker([h.lat, h.lng], {
       radius: r, color: h === selected ? '#111' : '#fff', weight: h === selected ? 2.5 : 0.7,
       fillColor: colorOf(h), fillOpacity: 0.8,
-    }).bindTooltip(`${h.n}<br>${groupLabel(h)}<br>${def.label}: ${def.keys ? fmt(v) + '件' : fmt(v) + '床'}`, { direction: 'top' });
+    }).bindTooltip(`${h.n}<br>${catLabel(h)}<br>${def.label}: ${def.keys ? fmt(v) + '件' : fmt(v) + '床'}`, { direction: 'top' });
     m.on('click', () => select(h));
     m.addTo(layer); markers.set(h.id, m);
   }
@@ -187,15 +213,25 @@ function select(h, fly) {
     </div>
     ${h.gr ? `<div class="group-box"><b><span class="sw" style="background:${GROUP_HEX[h.gr]}"></span>${groupLabel(h)}</b>
       <p>${META.groups.find(g => g.key === h.gr).desc}</p></div>` : ''}
+    ${h.cl ? `<div class="group-box"><b><span class="sw" style="background:${CLUSTER_HEX[h.cl]}"></span>クラスター：${clusterOf(h).label}</b>
+      <p>実績のパターンが似た${fmt(clusterOf(h).n)}施設の群</p></div>` : ''}
     <section><h3>病床数（合計 ${h.b[5] != null ? fmt(h.b[5]) + '床' : '不明'}）</h3><div class="beds">${bedsHtml || '<span class="note">内訳の登録なし</span>'}</div>
       ${d?.db ? `<p class="note">DPC算定病床：${fmt(d.db)}床</p>` : ''}</section>
     <section><h3>カテーテル室の循環器治療実績（${META.dpcPeriod}）</h3>${cathHtml}</section>
+    ${h.nn ? `<section><h3>実績が似ている病院</h3><ol class="similar">${h.nn.map(id => H.find(x => x.id === id)).map(s =>
+      `<li data-id="${s.id}"><span>${s.n}<small>${PREFS[s.p - 1]}・${clusterOf(s)?.label || ''}</small></span><span class="v">${fmt(metric(s, META.cath.map(x => x.key)).v)}件</span></li>`).join('')}</ol>
+      <p class="note">8治療の実績（対数変換・標準化）の距離が近い順。右はカテーテル治療の合計。</p></section>` : ''}
     <section><h3>診療科（${h.dp.length}）</h3><div class="depts">${h.dp.join('、') || '登録なし'}</div></section>
     <section>
       ${h.u ? `<a class="ext" href="${h.u}" target="_blank" rel="noopener">病院ホームページ ↗</a><br>` : ''}
       ${d?.iu ? `<a class="ext" href="${d.iu}" target="_blank" rel="noopener">病院指標（DPC病院情報の公表） ↗</a>` : ''}
     </section>`;
   $('detail').hidden = false;
+  $('detail-body').querySelectorAll('.similar li').forEach(li => li.onclick = () => {
+    const s = H.find(x => x.id === li.dataset.id);
+    if (!visible().includes(s)) catOn[$('color').value].add(mode().key(s));
+    select(s, true);
+  });
 }
 
 function setupSearch() {
@@ -209,7 +245,7 @@ function setupSearch() {
     box.querySelectorAll('[data-id]').forEach(el => el.onclick = () => {
       box.hidden = true; q.value = '';
       const h = H.find(x => x.id === el.dataset.id);
-      if (!visible().includes(h)) { $('filter').value = 'all'; $('beds').value = '0'; $('pref').value = ''; groupOn.add(groupKey(h)); }
+      if (!visible().includes(h)) { $('filter').value = 'all'; $('beds').value = '0'; $('pref').value = ''; catOn[$('color').value].add(mode().key(h)); }
       select(h, true);
     });
   });

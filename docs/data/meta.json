@@ -115,5 +115,353 @@
    "label": "10件以上の治療なし",
    "desc": "DPCデータはあるが、いずれのカテーテル治療も10件未満"
   }
- ]
+ ],
+ "clusters": [
+  {
+   "key": "c_all",
+   "label": "全領域・高実績（左心耳閉鎖まで）",
+   "n": 93,
+   "profile": [
+    {
+     "label": "PCI（AMI）",
+     "median": 106,
+     "rate": 100
+    },
+    {
+     "label": "PCI（狭心症）",
+     "median": 209,
+     "rate": 100
+    },
+    {
+     "label": "アブレーション",
+     "median": 349,
+     "rate": 100
+    },
+    {
+     "label": "ペースメーカー等",
+     "median": 116,
+     "rate": 100
+    },
+    {
+     "label": "経カテーテル弁治療",
+     "median": 78,
+     "rate": 92
+    },
+    {
+     "label": "左心耳閉鎖",
+     "median": 21,
+     "rate": 100
+    },
+    {
+     "label": "ステントグラフト",
+     "median": 51,
+     "rate": 99
+    },
+    {
+     "label": "末梢血管内治療",
+     "median": 93,
+     "rate": 100
+    }
+   ]
+  },
+  {
+   "key": "c_shd",
+   "label": "SHD・大動脈まで対応",
+   "n": 137,
+   "profile": [
+    {
+     "label": "PCI（AMI）",
+     "median": 85,
+     "rate": 100
+    },
+    {
+     "label": "PCI（狭心症）",
+     "median": 152,
+     "rate": 100
+    },
+    {
+     "label": "アブレーション",
+     "median": 239,
+     "rate": 99
+    },
+    {
+     "label": "ペースメーカー等",
+     "median": 94,
+     "rate": 100
+    },
+    {
+     "label": "経カテーテル弁治療",
+     "median": 52,
+     "rate": 100
+    },
+    {
+     "label": "左心耳閉鎖",
+     "median": 4.5,
+     "rate": 3
+    },
+    {
+     "label": "ステントグラフト",
+     "median": 53,
+     "rate": 100
+    },
+    {
+     "label": "末梢血管内治療",
+     "median": 61,
+     "rate": 97
+    }
+   ]
+  },
+  {
+   "key": "c_pci_ep_ao",
+   "label": "PCI＋アブレーション＋大動脈",
+   "n": 178,
+   "profile": [
+    {
+     "label": "PCI（AMI）",
+     "median": 74,
+     "rate": 100
+    },
+    {
+     "label": "PCI（狭心症）",
+     "median": 141,
+     "rate": 100
+    },
+    {
+     "label": "アブレーション",
+     "median": 142,
+     "rate": 94
+    },
+    {
+     "label": "ペースメーカー等",
+     "median": 69,
+     "rate": 100
+    },
+    {
+     "label": "経カテーテル弁治療",
+     "median": 4.5,
+     "rate": 5
+    },
+    {
+     "label": "左心耳閉鎖",
+     "median": 4.5,
+     "rate": 3
+    },
+    {
+     "label": "ステントグラフト",
+     "median": 32,
+     "rate": 99
+    },
+    {
+     "label": "末梢血管内治療",
+     "median": 53,
+     "rate": 98
+    }
+   ]
+  },
+  {
+   "key": "c_pci_ep",
+   "label": "PCI＋アブレーション",
+   "n": 218,
+   "profile": [
+    {
+     "label": "PCI（AMI）",
+     "median": 49,
+     "rate": 99
+    },
+    {
+     "label": "PCI（狭心症）",
+     "median": 117,
+     "rate": 100
+    },
+    {
+     "label": "アブレーション",
+     "median": 76,
+     "rate": 94
+    },
+    {
+     "label": "ペースメーカー等",
+     "median": 41,
+     "rate": 100
+    },
+    {
+     "label": "経カテーテル弁治療",
+     "median": 4.5,
+     "rate": 3
+    },
+    {
+     "label": "左心耳閉鎖",
+     "median": 4.5,
+     "rate": 0
+    },
+    {
+     "label": "ステントグラフト",
+     "median": 13.5,
+     "rate": 15
+    },
+    {
+     "label": "末梢血管内治療",
+     "median": 30,
+     "rate": 95
+    }
+   ]
+  },
+  {
+   "key": "c_pci",
+   "label": "PCI中心（急性心筋梗塞を含む）",
+   "n": 278,
+   "profile": [
+    {
+     "label": "PCI（AMI）",
+     "median": 30,
+     "rate": 99
+    },
+    {
+     "label": "PCI（狭心症）",
+     "median": 49,
+     "rate": 100
+    },
+    {
+     "label": "アブレーション",
+     "median": 4.5,
+     "rate": 27
+    },
+    {
+     "label": "ペースメーカー等",
+     "median": 29,
+     "rate": 100
+    },
+    {
+     "label": "経カテーテル弁治療",
+     "median": 4.5,
+     "rate": 0
+    },
+    {
+     "label": "左心耳閉鎖",
+     "median": 4.5,
+     "rate": 0
+    },
+    {
+     "label": "ステントグラフト",
+     "median": 13.5,
+     "rate": 7
+    },
+    {
+     "label": "末梢血管内治療",
+     "median": 4.5,
+     "rate": 38
+    }
+   ]
+  },
+  {
+   "key": "c_elective",
+   "label": "待機的PCI・末梢血管中心",
+   "n": 115,
+   "profile": [
+    {
+     "label": "PCI（AMI）",
+     "median": 4.5,
+     "rate": 43
+    },
+    {
+     "label": "PCI（狭心症）",
+     "median": 60,
+     "rate": 100
+    },
+    {
+     "label": "アブレーション",
+     "median": 4.5,
+     "rate": 33
+    },
+    {
+     "label": "ペースメーカー等",
+     "median": 14,
+     "rate": 65
+    },
+    {
+     "label": "経カテーテル弁治療",
+     "median": 4.5,
+     "rate": 0
+    },
+    {
+     "label": "左心耳閉鎖",
+     "median": 4.5,
+     "rate": 1
+    },
+    {
+     "label": "ステントグラフト",
+     "median": 13.5,
+     "rate": 5
+    },
+    {
+     "label": "末梢血管内治療",
+     "median": 24,
+     "rate": 97
+    }
+   ]
+  },
+  {
+   "key": "c_small",
+   "label": "小規模（実績が少ない）",
+   "n": 274,
+   "profile": [
+    {
+     "label": "PCI（AMI）",
+     "median": 4.5,
+     "rate": 19
+    },
+    {
+     "label": "PCI（狭心症）",
+     "median": 13,
+     "rate": 63
+    },
+    {
+     "label": "アブレーション",
+     "median": 4.5,
+     "rate": 15
+    },
+    {
+     "label": "ペースメーカー等",
+     "median": 11,
+     "rate": 56
+    },
+    {
+     "label": "経カテーテル弁治療",
+     "median": 4.5,
+     "rate": 0
+    },
+    {
+     "label": "左心耳閉鎖",
+     "median": 4.5,
+     "rate": 0
+    },
+    {
+     "label": "ステントグラフト",
+     "median": 13.5,
+     "rate": 3
+    },
+    {
+     "label": "末梢血管内治療",
+     "median": 4.5,
+     "rate": 20
+    }
+   ]
+  }
+ ],
+ "clusterInfo": {
+  "method": "k-means（k-means++初期化・30回試行の最良解）",
+  "k": 7,
+  "silhouette": 0.257,
+  "n": 1293,
+  "features": [
+   "PCI（AMI）",
+   "PCI（狭心症）",
+   "アブレーション",
+   "ペースメーカー等",
+   "経カテーテル弁治療",
+   "左心耳閉鎖",
+   "ステントグラフト",
+   "末梢血管内治療"
+  ],
+  "note": "各治療の退院患者数を log(1+件数) に変換して標準化。公表値が秘匿（0〜9件）の場合は4.5で補完。"
+ }
 }

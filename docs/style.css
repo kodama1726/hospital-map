@@ -65,6 +65,15 @@ input, select {
 .group-box b { display: flex; gap: 6px; align-items: center; font-size: 13px; }
 .group-box p { margin: 2px 0 0; color: var(--muted); }
 
+ol.similar { margin: 0; padding: 0; list-style: none; }
+ol.similar li {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 6px 0;
+  border-bottom: 1px solid var(--line); cursor: pointer; font-size: 13px;
+}
+ol.similar li:hover { color: var(--accent); }
+ol.similar small { display: block; color: var(--muted); font-size: 11px; }
+ol.similar .v { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+
 #rank h2, #detail h3 { font-size: 13px; margin: 0 0 6px; color: var(--muted); font-weight: 600; }
 #rank ol { margin: 0; padding: 0; list-style: none; }
 #rank li {

@@ -5,7 +5,7 @@
   "scripts": {
     "download": "node scripts/download.js",
     "geocode": "node scripts/geocode.js",
-    "build": "node scripts/build.js",
+    "build": "node scripts/build.js && node scripts/cluster.js",
     "serve": "node scripts/serve.js"
   },
   "keywords": [],
