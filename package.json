@@ -1,0 +1,19 @@
+{
+  "name": "hospital-map",
+  "version": "1.0.0",
+  "description": "全国の病院の病床とカテーテル治療実績を地図で見るサイト",
+  "scripts": {
+    "download": "node scripts/download.js",
+    "geocode": "node scripts/geocode.js",
+    "build": "node scripts/build.js",
+    "serve": "node scripts/serve.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  },
+  "private": true
+}

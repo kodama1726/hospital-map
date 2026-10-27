@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>病院マップ</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <header>
+      <h1>病院マップ</h1>
+      <p class="sub">全国の病院の病床とカテーテル治療実績</p>
+    </header>
+
+    <section class="controls">
+      <input id="q" type="search" placeholder="病院名で検索" autocomplete="off">
+      <div id="suggest" hidden></div>
+
+      <label>都道府県
+        <select id="pref"><option value="">全国</option></select>
+      </label>
+
+      <label>表示する病院
+        <select id="filter">
+          <option value="all">すべての病院</option>
+          <option value="dpc">DPC参加・準備病院</option>
+          <option value="cath" selected>カテーテル治療実績あり（いずれか10件以上）</option>
+        </select>
+      </label>
+
+      <label>病床数
+        <select id="beds">
+          <option value="0">指定なし</option>
+          <option value="20">20床以上</option>
+          <option value="100">100床以上</option>
+          <option value="200">200床以上</option>
+          <option value="400">400床以上</option>
+        </select>
+      </label>
+
+      <label>円の大きさ
+        <select id="size"></select>
+      </label>
+    </section>
+
+    <section id="stats"></section>
+    <section id="rank"></section>
+    <footer id="src"></footer>
+  </aside>
+
+  <main id="map"></main>
+
+  <section id="detail" hidden>
+    <button id="close" aria-label="閉じる">×</button>
+    <div id="detail-body"></div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
