@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カテ室材料の月別推移</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  /* カテゴリ色（dataviz 既定パレット：8スロット・固定順） */
+  :root {
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #8a8f98;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #9aa0a8;
+    }
+  }
+  body { overflow-y: auto; }
+  .page { max-width: 1120px; margin: 0 auto; padding: 20px 16px 48px; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .top a { color: var(--accent); font-size: 13px; }
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 8px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-size: 13px; padding: 6px 12px; border: 0; background: var(--panel); color: var(--ink); cursor: pointer;
+    border-right: 1px solid var(--line);
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+  #cat { min-width: 300px; }
+  .note { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 14px 0; }
+  .tiles .tile { background: var(--panel); border: 1px solid var(--line); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card h2 { font-size: 14px; margin: 0 0 2px; }
+  .card .sub { margin: 0 0 10px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chart { position: relative; height: 300px; }
+  table.mat { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.mat th, table.mat td { padding: 6px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+  table.mat th { font-size: 12px; color: var(--muted); font-weight: 600; cursor: pointer; white-space: nowrap; }
+  table.mat td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.mat td.sec { color: var(--muted); font-size: 12px; }
+  .spark { display: block; }
+  .spark rect { fill: var(--s1); }
+  .spark rect.na { fill: var(--line); }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } #cat { min-width: 0; width: 100%; } table.mat td.sec { display: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top">
+    <div>
+      <h1>カテ室材料の月別推移</h1>
+      <p class="sub">特定保険医療材料の全国月別数量を、Kコード種別（手技）ごとに対応する手技件数と並べて表示</p>
+    </div>
+    <a href="./">← 病院マップへ</a>
+  </div>
+
+  <div class="filters">
+    <select id="cat" aria-label="Kコード種別"></select>
+    <div class="seg" id="setting" role="group" aria-label="入院・外来">
+      <button data-v="all" aria-pressed="true">入院＋外来</button>
+      <button data-v="入院" aria-pressed="false">入院</button>
+      <button data-v="外来" aria-pressed="false">外来</button>
+    </div>
+  </div>
+  <p class="note" id="catnote"></p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>手技の月別算定回数</h2>
+      <p class="note sub" id="procsub"></p>
+      <div class="chart"><canvas id="procChart" aria-label="手技の月別算定回数"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>材料の月別数量（上位6品目）</h2>
+      <p class="note sub">年間数量の多い6品目。残りは「その他」に合算</p>
+      <div class="chart"><canvas id="matChart" aria-label="材料の月別数量"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h2>材料一覧</h2>
+    <p class="note sub">列名をクリックで並べ替え。「手技1件あたり」は年間数量 ÷ この種別の手技の年間算定回数（目安）。</p>
+    <div style="overflow-x:auto"><table class="mat" id="tbl"></table></div>
+  </div>
+
+  <p class="note" id="src" style="margin-top:16px"></p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="materials.js"></script>
+</body>
+</html>
